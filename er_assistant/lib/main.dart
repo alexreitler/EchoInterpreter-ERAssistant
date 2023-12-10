@@ -1,11 +1,21 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:provider/provider.dart';
+
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ImageModel(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -20,8 +30,19 @@ class MyApp extends StatelessWidget {
   }
 }
 
+class ImageModel extends ChangeNotifier {
+  String? _selectedImagePath;
+
+  String? get selectedImagePath => _selectedImagePath;
+
+  void setSelectedImagePath(String path) {
+    _selectedImagePath = path;
+    notifyListeners();
+  }
+}
+
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  const HomePage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -30,28 +51,30 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Home Page'),
       ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              CustomButton(label: 'A'),
-              CustomButton(label: 'B'),
-              CustomButton(label: 'C'),
-            ],
-          ),
-          const SizedBox(height: 20.0),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pushNamed(context, '/second');
-            },
-            child: const Text(
-              'FULL PROCEDURE',
-              style: TextStyle(fontSize: 16.0),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                CustomButton(label: 'A'),
+                CustomButton(label: 'B'),
+                CustomButton(label: 'C'),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 20.0),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/second');
+              },
+              child: const Text(
+                'FULL PROCEDURE',
+                style: TextStyle(fontSize: 16.0),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -80,89 +103,100 @@ class CustomButton extends StatelessWidget {
   }
 }
 
-class SecondPage extends StatelessWidget {
-  const SecondPage({super.key});
+class SecondPage extends StatefulWidget {
+  const SecondPage({Key? key}) : super(key: key);
+
+  @override
+  SecondPageState createState() => SecondPageState();
+}
+
+class SecondPageState extends State<SecondPage> {
+  Future<void> _pickImage(BuildContext context) async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+
+    if (result != null) {
+      Provider.of<ImageModel>(context, listen: false)
+          .setSelectedImagePath(result.files.single.path!);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          const Color(0xFF00001D), // Set your desired background color,
+      backgroundColor: const Color(0xFF00001D),
       appBar: AppBar(
         title: const Text('Second Page'),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                flex: 4,
-                child: Container(
-                  child: Image.asset(
-                    'assets/images/guideimg.png',
-                    //width: double.infinity, // Adjust the width as needed
-                    height: 545,
-                    //fit: BoxFit.contain, // Adjust the BoxFit as needed
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: 6,
-                child: Column(
-                  children: [
-                    //const Text('Waiting for upload...'),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: Image.network(
-                        'https://example.com/external_image.jpg',
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Text('Waiting for upload...',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.white));
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          //const Spacer(), // Add Spacer to push yellow bar to the bottom
-          Container(
-            height: 80.0, // Adjust the height as needed
-            color: Colors.yellow,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
                 Expanded(
                   flex: 4,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Handle file upload logic here
-                      // You can use packages like file_picker to implement file selection
-                      print('Upload button pressed.');
-                    },
-                    child: const Text('Upload'),
+                  child: Container(
+                    child: Image.asset(
+                      'assets/images/guideimg.png',
+                      height: 545,
+                    ),
                   ),
                 ),
                 Expanded(
                   flex: 6,
-                  child: Container(
-                    alignment: Alignment.center,
-                    color: Colors.red,
-                    padding: const EdgeInsets.all(10.0),
-                    child: const Text(
-                      'No abnormalities found',
-                      style: TextStyle(color: Colors.white),
-                    ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 20),
+                      Consumer<ImageModel>(
+                        builder: (context, imageModel, child) {
+                          return imageModel.selectedImagePath != null
+                              ? Image.file(
+                            File(imageModel.selectedImagePath!),
+                            height: 545,
+                            fit: BoxFit.cover,
+                          )
+                              : const Text(
+                            'Waiting for upload...',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-        ],
+            Container(
+              height: 80.0,
+              color: Colors.yellow,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    flex: 4,
+                    child: ElevatedButton(
+                      onPressed: () => _pickImage(context),
+                      child: const Text('Upload'),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 6,
+                    child: Container(
+                      alignment: Alignment.center,
+                      color: Colors.red,
+                      padding: const EdgeInsets.all(10.0),
+                      child: const Text(
+                        'No abnormalities found',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
