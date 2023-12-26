@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
+
+import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
-
 
 void main() {
   runApp(
@@ -69,9 +71,18 @@ class HomePage extends StatelessWidget {
               onPressed: () {
                 Navigator.pushNamed(context, '/second');
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.yellow,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.zero,
+                ),
+              ),
               child: const Text(
                 'FULL PROCEDURE',
-                style: TextStyle(fontSize: 16.0),
+                style: TextStyle(
+                  fontSize: 40.0,
+                  color: Color(0xFF00001D),
+                ),
               ),
             ),
           ],
@@ -93,12 +104,20 @@ class CustomButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ElevatedButton(
       onPressed: () {
-        // Add your button click logic here
         print('$label button pressed.');
       },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.yellow,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.zero,
+        ),
+      ),
       child: Text(
         label,
-        style: const TextStyle(fontSize: 16.0),
+        style: const TextStyle(
+          fontSize: 40.0,
+          color: Color(0xFF00001D),
+        ),
       ),
     );
   }
@@ -112,12 +131,53 @@ class SecondPage extends StatefulWidget {
 }
 
 class SecondPageState extends State<SecondPage> {
+  bool imagePicked = false;
+  bool pneumotoraxdetected = false;
+
   Future<void> _pickImage(BuildContext context) async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+    FilePickerResult? result =
+        await FilePicker.platform.pickFiles(type: FileType.image);
 
     if (result != null) {
       Provider.of<ImageModel>(context, listen: false)
           .setSelectedImagePath(result.files.single.path!);
+      sendImageToBackend(result.files.single.path);
+    }
+  }
+
+  Future<void> sendImageToBackend(String? filePath) async {
+    const url = 'http://127.0.0.1:5000/predict'; // modify url...
+    var request = http.MultipartRequest('POST', Uri.parse(url));
+
+    request.files.add(await http.MultipartFile.fromPath('image', filePath!));
+
+    try {
+      var response = await request.send();
+
+      if (response.statusCode == 200) {
+        var jsonResponse = json.decode(await response.stream.bytesToString());
+        var classProbabilities = jsonResponse['class_probabilities'];
+        if (classProbabilities == 'normal') {
+          setState(() {
+            imagePicked = true;
+
+            pneumotoraxdetected = false;
+          });
+          print('Normal image');
+        } else if (classProbabilities == 'pneumothorax') {
+          setState(() {
+            imagePicked = true;
+
+            pneumotoraxdetected = true;
+          });
+          print('Pneumothorax detected');
+        }
+        print('Image processed successfully');
+      } else {
+        print('Failed to process image. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error sending image: $e');
     }
   }
 
@@ -152,15 +212,18 @@ class SecondPageState extends State<SecondPage> {
                         builder: (context, imageModel, child) {
                           return imageModel.selectedImagePath != null
                               ? Image.file(
-                            File(imageModel.selectedImagePath!),
-                            height: 545,
-                            fit: BoxFit.cover,
-                          )
+                                  File(imageModel.selectedImagePath!),
+                                  height: 545,
+                                  fit: BoxFit.cover,
+                                )
                               : const Text(
-                            'Waiting for upload...',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white),
-                          );
+                                  'Waiting for upload...',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.yellow,
+                                    fontSize: 30.0,
+                                  ),
+                                );
                         },
                       ),
                     ],
@@ -176,23 +239,74 @@ class SecondPageState extends State<SecondPage> {
                 children: [
                   Expanded(
                     flex: 4,
-                    child: ElevatedButton(
-                      onPressed: () => _pickImage(context),
-                      child: const Text('Upload'),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 6,
                     child: Container(
-                      alignment: Alignment.center,
-                      color: Colors.red,
-                      padding: const EdgeInsets.all(10.0),
-                      child: const Text(
-                        'No abnormalities found',
-                        style: TextStyle(color: Colors.white),
+                      height: 80.0,
+                      child: ElevatedButton(
+                        onPressed: () => _pickImage(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.yellow,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text(
+                          'UPLOAD',
+                          style: TextStyle(
+                            fontSize: 40.0,
+                            color: Color(0xFF00001D),
+                          ),
+                        ),
                       ),
                     ),
                   ),
+                  if (imagePicked & !pneumotoraxdetected)
+                    Expanded(
+                      flex: 6,
+                      child: Container(
+                        alignment: Alignment.center,
+                        color: Colors.green,
+                        padding: const EdgeInsets.all(10.0),
+                        child: const Text(
+                          'No abnormalities found',
+                          style: TextStyle(
+                            color: Color(0xFF00001D),
+                            fontSize: 30.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (imagePicked & pneumotoraxdetected)
+                    Expanded(
+                      flex: 6,
+                      child: Container(
+                        alignment: Alignment.center,
+                        color: Colors.red,
+                        padding: const EdgeInsets.all(10.0),
+                        child: const Text(
+                          'PNEUMOTORAX',
+                          style: TextStyle(
+                            color: Color(0xFF00001D),
+                            fontSize: 30.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (!imagePicked)
+                    Expanded(
+                      flex: 6,
+                      child: Container(
+                        alignment: Alignment.center,
+                        color: Colors.yellow,
+                        padding: const EdgeInsets.all(10.0),
+                        child: const Text(
+                          'Waiting for uploud..',
+                          style: TextStyle(
+                            color: Color(0xFF00001D),
+                            fontSize: 30.0,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
